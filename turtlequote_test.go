@@ -1,8 +1,11 @@
 package turtlequote
 
 import (
+	"os/exec"
+	"strings"
 	"testing"
 	"testing/quick"
+	"unicode"
 )
 
 func TestEscape(t *testing.T) {
@@ -85,5 +88,54 @@ func TestRoundTrip(t *testing.T) {
 	}
 	if err := quick.Check(f, nil); err != nil {
 		t.Error(err)
+	}
+}
+
+func TestShellRoundTrips(t *testing.T) {
+	f := func(s string) bool {
+		s = strings.Map(func(r rune) rune {
+			// trim weird unicode; the shell can't unescape \u{foo} correctly
+			if !unicode.IsPrint(r) {
+				return 'x'
+			}
+			return r
+		}, s)
+		t.Logf(s)
+		esc := Escape(s)
+		output, err := exec.Command("sh", "-c", "echo "+esc).CombinedOutput()
+		if err != nil {
+			t.Errorf("error on %q (output %q): %v", s, string(output), err)
+			return false
+		}
+		if len(output) == 0 {
+			t.Error("zero length output; expected newline at end")
+			return false
+		}
+		outStr := string(output[0 : len(output)-1])
+		if outStr != s {
+			t.Errorf("echo gave %q, not %q", outStr, s)
+			return false
+		}
+		return true
+	}
+	if err := quick.Check(f, nil); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestShellRoundTripCases(t *testing.T) {
+	s := "xxxx&xxxxxxxxxx𐆚xxxxxxxxxxxxxxxx侀xxxxx"
+	esc := Escape(s)
+	t.Logf("escaped: %v", esc)
+	output, err := exec.Command("sh", "-c", "echo "+esc).CombinedOutput()
+	if err != nil {
+		t.Errorf("error on %q (output %q): %v", s, string(output), err)
+	}
+	if len(output) == 0 {
+		t.Error("zero length output; expected newline at end")
+	}
+	outStr := string(output[0 : len(output)-1])
+	if outStr != s {
+		t.Errorf("echo gave %q, not %q", outStr, s)
 	}
 }

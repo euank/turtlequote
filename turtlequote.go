@@ -16,7 +16,7 @@ func Escape(s string) string {
 		case c == '\'', c == '\\':
 			singleQuotable = false
 			needsQuoting = true
-		case c == '"', c == ' ':
+		case c == '"', c == ' ', c == '&':
 			// single-quotable still if it's just double quotes and spaces
 			needsQuoting = true
 		case unicode.IsSpace(c), unicode.In(c, unicode.Zl, unicode.Zp, unicode.Zs, unicode.Other):
